@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paddock Cameras</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0d0f12; --panel:#15181d; --panel2:#1b1f25; --line:#262b33; --line2:#323843;
+  --text:#e4e7eb; --muted:#8b95a3; --faint:#5d6674;
+  --sel:#ffb21e; --tally:#ff4b3e; --ok:#3ccb7f; --warn:#ffcc4d; --bad:#ff5a4f;
+  --onb:#39d0c8; --dyn:#b58cff; --dir:#ff8a3d; --car:#3b4250; --car2:#58606e;
+  --ui: "Barlow", system-ui, "Segoe UI", sans-serif;
+  --disp: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.4 var(--ui)}
+button,input,select{font:inherit;color:inherit}
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100%}
+header{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.brand{font:700 18px var(--disp);letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--tally);box-shadow:0 0 8px var(--tally)}
+.brand small{font:500 12px var(--mono);color:var(--muted);letter-spacing:0;text-transform:none}
+.spacer{flex:1}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+.btn.primary{background:var(--sel);color:#16120a;border-color:var(--sel);font-weight:600}
+.btn.small{padding:3px 8px;font:12px var(--mono)}
+.btn.on{border-color:var(--sel);color:var(--sel)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:default}
+select,input[type=text]{background:var(--bg);border:1px solid var(--line2);border-radius:6px;padding:5px 8px}
+input.num{font-family:var(--mono);font-variant-numeric:tabular-nums;width:100%}
+.main{display:grid;grid-template-columns:240px 1fr;min-height:0}
+nav{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px 10px}
+nav h3{font:600 11.5px var(--disp);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:14px 6px 6px}
+nav h3:first-child{margin-top:2px}
+.item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.item:hover{background:var(--panel2)}
+.item.sel{background:rgba(255,178,30,.12);outline:1px solid rgba(255,178,30,.4)}
+.item .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.item .meta{margin-left:auto;font:11.5px var(--mono);color:var(--faint)}
+.content{overflow:auto;min-height:0;padding:18px 20px 40px}
+.content h1{font:700 24px var(--disp);margin:0 0 2px;letter-spacing:.01em}
+.content .sub{color:var(--muted);margin:0 0 16px;max-width:75ch}
+.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,1fr);gap:18px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{font:600 12px var(--disp);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px}
+.card h2 span{font:11.5px var(--mono);letter-spacing:0;text-transform:none;color:var(--faint)}
+.views{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.view{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.view .vh{display:flex;justify-content:space-between;font:11.5px var(--mono);color:var(--muted);margin-bottom:4px}
+.view canvas{width:100%;height:300px;display:block;touch-action:none;cursor:crosshair}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field>span{font-size:12px;color:var(--muted)}
+.field small{font-size:11.5px;color:var(--faint);line-height:1.3}
+.params{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 14px}
+.pgroup{grid-column:1/-1;font:600 11.5px var(--disp);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+.pgroup:first-child{border-top:0;padding-top:0;margin-top:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:14px}
+.note{font-size:12.5px;color:var(--muted)}
+.note b{color:var(--text);font-weight:500}
+.spin{position:relative;display:block}
+.spin input{padding-right:26px}
+.spin .sb{position:absolute;right:1px;width:22px;height:calc(50% - 1px);display:grid;place-items:center;background:var(--panel2);border:0;border-left:1px solid var(--line2);color:var(--muted);cursor:pointer;padding:0;font-size:9px;line-height:1;user-select:none}
+.spin .sb.up{top:1px;border-radius:0 5px 0 0;border-bottom:1px solid var(--line2)}
+.spin .sb.dn{bottom:1px;border-radius:0 0 5px 0}
+.spin .sb:hover{color:var(--sel);background:var(--line)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line2);background:var(--bg);border-radius:99px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted)}
+.chip.on{border-color:var(--c,var(--sel));color:var(--text);background:color-mix(in srgb, var(--c,var(--sel)) 18%, var(--bg))}
+.rule{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:10px}
+.rule.hit{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+.rule .rh{display:flex;gap:8px;align-items:center}
+.rule .ord{font:600 12px var(--mono);color:var(--faint);width:24px}
+.conds{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+.tester{position:sticky;top:0}
+.tester .res{font:13px var(--mono);margin-top:10px;padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
+.tester .res b{color:var(--ok)}
+.slider{display:grid;grid-template-columns:90px 1fr 70px;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--muted)}
+.slider output{font:12.5px var(--mono);color:var(--text);text-align:right}
+input[type=range]{accent-color:var(--sel);width:100%}
+#resp{width:100%;height:170px;display:block}
+footer{border-top:1px solid var(--line);background:var(--panel);padding:7px 16px;font:12px var(--mono);color:var(--muted)}
+footer.err{color:var(--bad)}
+.empty{display:grid;place-items:center;height:100%;padding:24px}
+.empty .card{max-width:560px;padding:24px}
+.empty h1{font:700 26px var(--disp);margin:0 0 8px;text-wrap:balance}
+.empty p{color:var(--muted);margin:0 0 12px}
+.empty code{font:12.5px var(--mono);color:var(--text);background:var(--bg);padding:1px 5px;border-radius:4px}
+@media (max-width:1100px){ .cols{grid-template-columns:1fr} }
+@media (max-width:760px){ .main{grid-template-columns:1fr} nav{border-right:0;border-bottom:1px solid var(--line);max-height:34vh} .views{grid-template-columns:1fr} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><i></i>Paddock Cameras <small id="where">no settings loaded</small></div>
+    <div class="spacer"></div>
+    <button class="btn" id="bOpen">Open the paddock_cameras folder</button>
+    <button class="btn" id="bUndo" disabled title="Ctrl+Z">Undo</button>
+    <button class="btn primary" id="bSave" disabled title="Ctrl+S">Save</button>
+  </header>
+  <div class="main" id="main" hidden>
+    <nav id="nav"></nav>
+    <div class="content" id="content"></div>
+  </div>
+  <div class="empty" id="empty">
+    <div class="card">
+      <h1>Edit the Paddock Cameras</h1>
+      <p>Open the <code>assettocorsa/apps/lua/paddock_cameras</code> folder. The editor reads <code>paddock_cameras.ini</code>, and when you save, the app reloads it by itself in game: the change shows in OBS at once, with no restart.</p>
+      <p>The render options (mipmaps, shadows) are not here: they only apply when a source is created.</p>
+      <div class="row"><button class="btn primary" id="bOpen2">Open the paddock_cameras folder</button>
+      <label class="btn" for="fileIn">Open paddock_cameras.ini only</label><input type="file" id="fileIn" accept=".ini" hidden></div>
+    </div>
+  </div>
+  <footer id="status">Ready.</footer>
+</div>
+
+<script>
+"use strict";
+// ============================================================ utilities
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const D2R = Math.PI / 180;
+const fmtN = (v) => { if (!isFinite(v)) return "0"; const s = Number(v.toPrecision(7)).toString(); return s === "-0" ? "0" : s; };
+const num = (s) => parseFloat(String(s).replace(",", ".").replace(/[^0-9eE.+-]/g, ""));
+const KMH = 3.6;
+function status(m, err) { const f = $("status"); f.textContent = m; f.classList.toggle("err", !!err); }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+function levelUp(f) { const r = norm3(cross3([0, 1, 0], f)); return norm3(cross3(f, r)); }
+function getOrient(fwd, up) {
+  const f = norm3(fwd); const u0 = levelUp(f), u = norm3(up);
+  return { yaw: Math.atan2(f[0], f[2]) / D2R, pitch: Math.asin(clamp(f[1], -1, 1)) / D2R, roll: Math.atan2(dot3(cross3(u0, u), f), dot3(u0, u)) / D2R };
+}
+function fromOrient(yaw, pitch, roll) {
+  pitch = clamp(pitch, -89.5, 89.5);
+  const y = yaw * D2R, p = pitch * D2R, r = roll * D2R;
+  const f = [Math.sin(y) * Math.cos(p), Math.sin(p), Math.cos(y) * Math.cos(p)];
+  const u0 = levelUp(f), fu = cross3(f, u0);
+  const u = norm3([0, 1, 2].map((k) => u0[k] * Math.cos(r) + fu[k] * Math.sin(r)));
+  const r6 = (v) => +v.toFixed(6);
+  return { fwd: f.map(r6), up: u.map(r6) };
+}
+const wrap180 = (a) => ((a + 180) % 360 + 360) % 360 - 180;
+
+// ============================================================ parameter descriptions
+// [label, unit, step, help, group]
+const PDEF = {
+  HEIGHT: ["Height", "m", 1, "Height of the camera above the car.", "Position"],
+  BACK: ["Behind the car", "m", 1, "Distance behind, along the car's travel.", "Position"],
+  SIDE: ["Sideways", "m", 1, "Positive = the car's right, negative = left.", "Position"],
+  UP: ["Height", "m", 0.5, "Height above the pit box.", "Position"],
+  FWD: ["Forward / back", "m", 0.5, "From the centre of the pit box (0 = centred).", "Position"],
+  OUTSIDE_BIAS: ["Out in corners", "m", 1, "How far it moves to the outside of a corner per rad/s of the car's yaw.", "Position"],
+  YAW_FLIP: ["Side in corners", "±1", 2, "−1 = outside of the corner, +1 = inside.", "Position"],
+  LOOK_AHEAD: ["Looks ahead", "m", 5, "How far ahead along the track it aims.", "Position"],
+  STIFFNESS: ["Spring", "", 0.01, "How hard it is pulled back into place. Low = lazy, heavier.", "Inertia"],
+  DAMPING: ["Damping", "", 0.05, "Brakes the movement. Near 2·√spring it does not oscillate.", "Inertia"],
+  MAX_SPEED: ["Top speed", "m/s", 5, "The camera's speed cap. A faster car leaves it behind.", "Inertia"],
+  MAX_DIST: ["Maximum distance", "m", 5, "Never lets the car get further than this.", "Inertia"],
+  LOOKAHEAD: ["Anticipation", "s", 0.05, "Aims where the car will be in this many seconds.", "Inertia"],
+  YAW_SMOOTH: ["Yaw smoothing", "s", 0.1, "Avoids jumps on corner entry and exit.", "Inertia"],
+  SPEED: ["Travel speed", "m/s", 5, "How fast it flies along the track.", "Inertia"],
+  SOFT_DIST: ["Rescue: starts at", "m", 10, "From this distance it speeds up and zooms in.", "Rescue"],
+  HARD_DIST: ["Rescue: full at", "m", 10, "The distance where the rescue is at its maximum.", "Rescue"],
+  SPEED_BOOST: ["Rescue: speed boost", "×", 0.02, "0.28 = +28% over the top speed.", "Rescue"],
+  FOV_FAST: ["FOV on straights", "°", 1, "Zoom when it is fast.", "Zoom"],
+  FOV_SLOW: ["FOV in slow corners", "°", 1, "Zoom when it is slow.", "Zoom"],
+  SPEED_FAST: ["Straight speed", "m/s", 5, "From here up it uses the straights FOV.", "Zoom"],
+  SPEED_SLOW: ["Slow speed", "m/s", 5, "Below this it uses the slow-corner FOV.", "Zoom"],
+  FOV_BASE: ["Normal FOV", "°", 1, "Zoom with the car close.", "Zoom"],
+  FOV_TIGHT: ["FOV at full zoom", "°", 1, "Zoom once the car has got away (rescue).", "Zoom"],
+  FOV_STRAIGHT: ["FOV on straights", "°", 1, "", "Zoom"],
+  FOV_CURVE: ["FOV in corners", "°", 1, "", "Zoom"],
+  FOV_SMOOTH: ["Zoom smoothing", "s", 0.1, "How long a change of zoom takes.", "Zoom"],
+};
+const CAM_DESC = {
+  "Drone Cam": "An overhead drone on a stable gimbal: it sits above the car and swings to the outside of corners.",
+  "Helicopter Cam": "A broadcast helicopter: high, behind and to one side, with a lot of inertia and a long lens.",
+  "Pit Cam": "Looking down on the pit box from above the garage.",
+  "Circuit Cam": "A cinematic flight along the track, independent of the car.",
+  "SC Chase Aerial": "A low aerial chase of the Safety Car with the pack behind it.",
+  "SC Side Pack": "From the side on a medium long lens, stacking the pack behind the Safety Car.",
+  "Helmet Cam": "The driver's eyes, with AC's head movement. Only the FOV and near plane are adjustable.",
+};
+
+// ============================================================ state
+const S = { dir: null, fileName: "paddock_cameras.ini", header: [], cams: [], director: { minTime: 8, urgent: [] }, rules: [],
+  sel: { kind: "none" }, dirty: false, undo: [], test: { speed: 150, brake: 0, gas: 1, steer: 0, pit: false } };
+
+// ============================================================ ini
+function parseIni(text) {
+  const secs = []; let cur = null; const header = [];
+  for (let raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!cur && line.startsWith(";")) { header.push(line); continue; }
+    if (!line || line.startsWith(";")) continue;
+    const m = line.match(/^\[(.+)\]$/); if (m) { cur = { name: m[1], kv: {}, order: [] }; secs.push(cur); continue; }
+    const e = line.indexOf("="); if (e > 0 && cur) { const k = line.slice(0, e).trim(); cur.kv[k] = line.slice(e + 1).trim(); cur.order.push(k); }
+  }
+  return { secs, header };
+}
+const vec = (s) => { const t = String(s || "").split(",").map(num); return t.length >= 3 && t.every(isFinite) ? t.slice(0, 3) : null; };
+function loadModel(text) {
+  const { secs, header } = parseIni(text);
+  S.header = header.length ? header : ["; Paddock Cameras · settings of the OBS cameras"];
+  S.cams = []; S.rules = []; S.director = { minTime: 8, urgent: [] };
+  for (const s of secs) {
+    const cm = s.name.match(/^CAM:(.+)$/);
+    if (cm) {
+      const kv = s.kv; const c = { name: cm[1], type: kv.TYPE || (kv.OFFSET ? "onboard" : "dynamic"), fov: num(kv.FOV), near: num(kv.NEAR), params: {}, porder: [] };
+      if (c.type === "onboard") { c.offset = vec(kv.OFFSET) || [0, 1, 0]; c.fwd = vec(kv.FORWARD) || [0, 0, 1]; c.up = vec(kv.UP) || [0, 1, 0]; }
+      const skip = c.type === "onboard" ? ["TYPE", "FOV", "NEAR", "OFFSET", "FORWARD", "UP"] : ["TYPE", "FOV", "NEAR"];
+      for (const k of s.order) if (!skip.includes(k)) { c.params[k] = num(kv[k]); c.porder.push(k); }
+      S.cams.push(c);
+    } else if (s.name === "DIRECTOR") {
+      S.director.minTime = num(s.kv.MIN_TIME); if (!isFinite(S.director.minTime)) S.director.minTime = 8;
+      S.director.urgent = (s.kv.URGENT || "").split("|").map((x) => x.trim()).filter(Boolean);
+    } else if (/^RULE_\d+$/.test(s.name)) {
+      const kv = s.kv, n = (k) => (kv[k] === undefined || kv[k] === "" ? null : num(kv[k]));
+      S.rules.push({ order: +s.name.slice(5), name: kv.NAME || "", inPit: kv.IN_PIT === "1" ? true : kv.IN_PIT === "0" ? false : null,
+        brakeMin: n("BRAKE_MIN"), gasMin: n("GAS_MIN"), speedMin: n("SPEED_MIN"), speedMax: n("SPEED_MAX"), steerMin: n("STEER_MIN"), steerMax: n("STEER_MAX"),
+        pool: (kv.POOL || "").split("|").map((x) => x.trim()).filter(Boolean) });
+    }
+  }
+  S.rules.sort((a, b) => a.order - b.order);
+  S.sel = S.cams.length ? { kind: "cam", i: 0 } : { kind: "director" };
+  S.dirty = false; S.undo = [];
+}
+function serialize() {
+  const L = [...S.header, ""];
+  for (const c of S.cams) {
+    L.push(`[CAM:${c.name}]`, `TYPE=${c.type}`);
+    if (isFinite(c.fov)) L.push(`FOV=${fmtN(c.fov)}`);
+    if (isFinite(c.near)) L.push(`NEAR=${fmtN(c.near)}`);
+    if (c.type === "onboard") { L.push("OFFSET=" + c.offset.map(fmtN).join(", "), "FORWARD=" + c.fwd.map(fmtN).join(", "), "UP=" + c.up.map(fmtN).join(", ")); }
+    for (const k of c.porder) L.push(`${k}=${fmtN(c.params[k])}`);
+    L.push("");
+  }
+  L.push("[DIRECTOR]", `MIN_TIME=${fmtN(S.director.minTime)}`, `URGENT=${S.director.urgent.join("|")}`, "");
+  S.rules.forEach((r, i) => {
+    L.push(`[RULE_${i}]`, `NAME=${r.name}`);
+    if (r.inPit !== null) L.push(`IN_PIT=${r.inPit ? 1 : 0}`);
+    for (const [k, key] of [["brakeMin", "BRAKE_MIN"], ["gasMin", "GAS_MIN"], ["speedMin", "SPEED_MIN"], ["speedMax", "SPEED_MAX"], ["steerMin", "STEER_MIN"], ["steerMax", "STEER_MAX"]])
+      if (r[k] !== null && isFinite(r[k])) L.push(`${key}=${fmtN(r[k])}`);
+    L.push(`POOL=${r.pool.join("|")}`, "");
+  });
+  return L.join("\r\n");
+}
+
+// ============================================================ files
+function stamp() { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+async function openDir() {
+  if (!window.showDirectoryPicker) { $("fileIn").click(); return; }
+  try {
+    const h = await window.showDirectoryPicker({ id: "paddock-cameras", mode: "readwrite" });
+    let fh; try { fh = await h.getFileHandle("paddock_cameras.ini"); } catch { status("That folder has no paddock_cameras.ini: pick apps/lua/paddock_cameras.", true); return; }
+    S.dir = h; loadModel(await (await fh.getFile()).text());
+    $("where").textContent = h.name + "/paddock_cameras.ini"; start();
+    status(`Loaded ${S.cams.length} cameras and ${S.rules.length} director rules. When you save, the app reloads them live.`);
+  } catch (e) { if (e.name !== "AbortError") status("Could not open it: " + e.message, true); }
+}
+$("fileIn").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return; S.dir = null; loadModel(await f.text());
+  $("where").textContent = f.name + " · read-only"; start();
+  status("Opened read-only: Save downloads the file, and you copy it into apps/lua/paddock_cameras.");
+};
+async function save() {
+  const text = serialize();
+  try {
+    if (S.dir) {
+      try {
+        const old = await (await (await S.dir.getFileHandle("paddock_cameras.ini")).getFile()).text();
+        const b = await S.dir.getDirectoryHandle("_backup", { create: true });
+        const w0 = await (await b.getFileHandle(`paddock_cameras_${stamp()}.ini`, { create: true })).createWritable(); await w0.write(old); await w0.close();
+      } catch (e) { if (e.name !== "NotFoundError") throw e; }
+      const w = await (await S.dir.getFileHandle("paddock_cameras.ini", { create: true })).createWritable(); await w.write(text); await w.close();
+      status("Saved. If AC is running, the app has reloaded it already (the previous file is in paddock_cameras/_backup).");
+    } else {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" })); a.download = "paddock_cameras.ini"; a.click();
+      status("Downloaded paddock_cameras.ini: copy it into apps/lua/paddock_cameras, replacing the old one.");
+    }
+    S.dirty = false; refresh();
+  } catch (e) { status("Could not save it: " + e.message, true); }
+}
+$("bOpen").onclick = openDir; $("bOpen2").onclick = openDir; $("bSave").onclick = save;
+function snapshot() { S.undo.push(JSON.stringify({ cams: S.cams, director: S.director, rules: S.rules })); if (S.undo.length > 100) S.undo.shift(); S.dirty = true; }
+function undo() { const u = S.undo.pop(); if (!u) return; Object.assign(S, JSON.parse(u)); S.dirty = true; render(); }
+$("bUndo").onclick = undo;
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (S.cams.length) save(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); undo(); }
+});
+window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+// ============================================================ navigation
+function start() { $("empty").hidden = true; $("main").hidden = false; render(); }
+function refresh() {
+  $("bSave").disabled = !S.cams.length; $("bUndo").disabled = !S.undo.length;
+  $("bSave").textContent = S.dirty ? "Save *" : "Save";
+  document.title = (S.dirty ? "• " : "") + "Paddock Cameras";
+}
+function renderNav() {
+  const nav = $("nav"); nav.innerHTML = "";
+  const group = (title, list) => {
+    const h = document.createElement("h3"); h.textContent = title; nav.appendChild(h);
+    for (const it of list) {
+      const b = document.createElement("button"); b.className = "item" + (it.sel ? " sel" : ""); b.style.setProperty("--c", `var(${it.color})`);
+      b.innerHTML = `<span class="dot"></span><span></span><span class="meta"></span>`;
+      b.children[1].textContent = it.label; b.children[2].textContent = it.meta || "";
+      b.onclick = it.onclick; nav.appendChild(b);
+    }
+  };
+  const isSel = (i) => S.sel.kind === "cam" && S.sel.i === i;
+  group("Onboard", S.cams.map((c, i) => ({ c, i })).filter((x) => x.c.type === "onboard").map(({ c, i }) => ({ label: c.name, meta: fmtN(c.fov) + "°", color: "--onb", sel: isSel(i), onclick: () => { S.sel = { kind: "cam", i }; render(); } })));
+  group("Dynamic", S.cams.map((c, i) => ({ c, i })).filter((x) => x.c.type !== "onboard").map(({ c, i }) => ({ label: c.name, meta: fmtN(c.fov) + "°", color: "--dyn", sel: isSel(i), onclick: () => { S.sel = { kind: "cam", i }; render(); } })));
+  group("Director", [{ label: "Stream · cutting rules", meta: S.rules.length + " rules", color: "--dir", sel: S.sel.kind === "director", onclick: () => { S.sel = { kind: "director" }; render(); } }]);
+}
+function render() { renderNav(); const c = S.cams[S.sel.i]; if (S.sel.kind === "director") renderDirector(); else if (c && c.type === "onboard") renderOnboard(c); else if (c) renderDynamic(c); refresh(); }
+
+// a number field with arrows: onchange(v) receives the number
+function numField(label, value, step, onchange, opts = {}) {
+  const wrap = document.createElement("label"); wrap.className = "field";
+  wrap.innerHTML = `<span>${esc(label)}${opts.unit ? ` <span style="color:var(--faint)">(${esc(opts.unit)})</span>` : ""}</span>`;
+  const sp = document.createElement("span"); sp.className = "spin";
+  const inp = document.createElement("input"); inp.type = "text"; inp.inputMode = "decimal"; inp.className = "num"; inp.autocomplete = "off";
+  const dec = Math.max(0, (String(step).split(".")[1] || "").length);
+  const show = (v) => { inp.value = v === null || !isFinite(v) ? "" : (opts.display ? opts.display(v) : +(+v).toFixed(Math.max(dec, 3)) + ""); };
+  show(value); sp.appendChild(inp);
+  let snapped = false;
+  const commit = (v) => { if (!snapped) { snapshot(); snapped = true; } onchange(v); refresh(); if (opts.after) opts.after(); };
+  inp.addEventListener("focus", () => { snapped = false; });
+  inp.addEventListener("input", () => { const raw = inp.value.trim(); if (raw === "" && opts.allowEmpty) { commit(null); return; } const v = num(raw); if (isFinite(v)) commit(opts.parse ? opts.parse(v) : v); });
+  const stepBy = (dir, e) => { let v = num(inp.value); if (!isFinite(v)) v = 0; v = +(v + dir * step * (e.shiftKey ? 10 : e.ctrlKey ? 0.1 : 1)).toFixed(dec + 2); if (opts.wrap) v = opts.wrap(v); inp.value = String(v); commit(opts.parse ? opts.parse(v) : v); };
+  for (const [cls, dir, sym] of [["up", 1, "▲"], ["dn", -1, "▼"]]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "sb " + cls; b.textContent = sym; b.tabIndex = -1;
+    let t = null, r = null; const stop = () => { clearTimeout(t); clearInterval(r); };
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); snapped = false; stepBy(dir, e); t = setTimeout(() => { r = setInterval(() => stepBy(dir, e), 60); }, 380); });
+    b.addEventListener("pointerup", stop); b.addEventListener("pointerleave", stop); sp.appendChild(b);
+  }
+  inp.addEventListener("keydown", (e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); snapped = false; stepBy(e.key === "ArrowUp" ? 1 : -1, e); } });
+  wrap.appendChild(sp);
+  if (opts.help) { const s = document.createElement("small"); s.textContent = opts.help; wrap.appendChild(s); }
+  wrap.set = show; wrap.input = inp;
+  return wrap;
+}
+
+// ============================================================ onboard cameras (the car from above and from the side)
+let OB = null;   // the onboard editor's state
+function renderOnboard(c) {
+  const box = $("content");
+  box.innerHTML = `<h1></h1><p class="sub">A camera fixed to the car. Local coordinates: <b>Z+ forward</b>, <b>Y+ up</b>, <b>X+ right</b>. The car's outline is only a guide; check the framing in OBS, which updates when you save.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="views">
+        <div class="view"><div class="vh"><span>FROM ABOVE · drag the camera or its arrow</span><span id="vTopInfo"></span></div><canvas id="cvTop"></canvas></div>
+        <div class="view"><div class="vh"><span>FROM THE SIDE (right)</span><span id="vSideInfo"></span></div><canvas id="cvSide"></canvas></div>
+      </div>
+      <div class="card"><h2>Other onboard cameras<span>click to select</span></h2><div class="chips" id="obOthers"></div></div>
+    </div>
+    <div class="stack">
+      <div class="card"><h2>Position<span>metres</span></h2><div class="grid3" id="obPos"></div></div>
+      <div class="card"><h2>Orientation<span>degrees</span></h2><div class="grid3" id="obRot"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn small" data-yaw="0">Look forward</button><button class="btn small" data-yaw="180">Look back</button>
+          <button class="btn small" data-yaw="90">Right</button><button class="btn small" data-yaw="-90">Left</button><button class="btn small" id="obLevel">Level</button>
+        </div></div>
+      <div class="card"><h2>Lens</h2><div class="grid2" id="obOpt"></div></div>
+    </div>
+  </div>`;
+  box.querySelector("h1").textContent = c.name;
+  const o = getOrient(c.fwd, c.up);
+  const pos = $("obPos"), rot = $("obRot"), opt = $("obOpt");
+  const fx = numField("X (right)", c.offset[0], 0.01, (v) => { c.offset[0] = v; drawOb(); });
+  const fy = numField("Y (height)", c.offset[1], 0.01, (v) => { c.offset[1] = v; drawOb(); });
+  const fz = numField("Z (forward)", c.offset[2], 0.01, (v) => { c.offset[2] = v; drawOb(); });
+  pos.append(fx, fy, fz);
+  const setRot = (k, v) => { const oo = getOrient(c.fwd, c.up); oo[k] = v; const r = fromOrient(oo.yaw, oo.pitch, oo.roll); c.fwd = r.fwd; c.up = r.up; drawOb(); };
+  const fyaw = numField("Heading", o.yaw, 1, (v) => setRot("yaw", v), { wrap: wrap180, display: (v) => (+v).toFixed(1), help: "0 = forward, 180 = backward" });
+  const fpit = numField("Pitch", o.pitch, 0.5, (v) => setRot("pitch", v), { display: (v) => (+v).toFixed(1), help: "Positive = up" });
+  const frol = numField("Roll", o.roll, 0.5, (v) => setRot("roll", v), { display: (v) => (Math.abs(v) < 0.05 ? 0 : +v).toFixed(1), help: "A tilted horizon" });
+  rot.append(fyaw, fpit, frol);
+  opt.append(numField("Vertical FOV", c.fov, 1, (v) => { c.fov = v; drawOb(); }, { unit: "°" }), numField("Near plane", c.near, 0.01, (v) => { c.near = v; }, { unit: "m", help: "Raise it if you see inside the car or a clipped halo." }));
+  box.querySelectorAll("[data-yaw]").forEach((b) => b.onclick = () => { snapshot(); setRot("yaw", +b.dataset.yaw); syncOb(); refresh(); });
+  $("obLevel").onclick = () => { snapshot(); setRot("roll", 0); syncOb(); refresh(); };
+  const others = $("obOthers");
+  S.cams.forEach((cc, i) => { if (cc.type !== "onboard") return; const ch = document.createElement("button"); ch.className = "chip" + (cc === c ? " on" : ""); ch.style.setProperty("--c", "var(--onb)"); ch.textContent = cc.name; ch.onclick = () => { S.sel = { kind: "cam", i }; render(); }; others.appendChild(ch); });
+  OB = { c, fx, fy, fz, fyaw, fpit, frol };
+  bindObCanvas($("cvTop"), "top"); bindObCanvas($("cvSide"), "side");
+  requestAnimationFrame(drawOb);
+}
+function syncOb() { if (!OB) return; const c = OB.c, o = getOrient(c.fwd, c.up); OB.fx.set(c.offset[0]); OB.fy.set(c.offset[1]); OB.fz.set(c.offset[2]); OB.fyaw.set(o.yaw); OB.fpit.set(o.pitch); OB.frol.set(o.roll); drawOb(); }
+// views: top: horizontal = X (right), vertical = Z (forward is up). side: horizontal = Z (forward is right), vertical = Y
+function obView(cv, kind) {
+  const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr)) { cv.width = r.width * dpr; cv.height = r.height * dpr; }
+  const W = cv.width, H = cv.height;
+  const span = kind === "top" ? { u: [-1.9, 1.9], v: [-3.4, 3.4] } : { u: [-3.4, 3.6], v: [-0.4, 2.2] };
+  const sc = Math.min(W / (span.u[1] - span.u[0]), H / (span.v[1] - span.v[0]));
+  const cu = (span.u[0] + span.u[1]) / 2, cvv = (span.v[0] + span.v[1]) / 2;
+  const P = (u, v) => [W / 2 + (u - cu) * sc, H / 2 - (v - cvv) * sc];
+  const inv = (px, py) => [(px - W / 2) / sc + cu, -(py - H / 2) / sc + cvv];
+  return { W, H, sc, P, inv, dpr };
+}
+const TOP_CAR = [[0,2.95],[0.18,2.9],[0.25,2.4],[0.3,1.6],[0.45,1.1],[0.55,0.7],[0.6,0.2],[0.55,-0.8],[0.5,-1.4],[0.35,-2.1],[0.4,-2.5],[0.5,-2.7]];
+const SIDE_CAR = [[2.95,0.12],[2.6,0.2],[1.6,0.35],[0.9,0.5],[0.45,0.62],[0.3,0.95],[0,1.02],[-0.4,0.98],[-0.9,0.78],[-1.9,0.62],[-2.35,0.95],[-2.75,0.95],[-2.75,0.2],[-2.3,0.05],[2.9,0.05]];
+function drawCar(ctx, v, kind) {
+  ctx.fillStyle = css("--car"); ctx.strokeStyle = css("--car2"); ctx.lineWidth = 1 * v.dpr;
+  ctx.beginPath();
+  if (kind === "top") {
+    TOP_CAR.forEach(([x, z], i) => { const [a, b] = v.P(x, z); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); });
+    [...TOP_CAR].reverse().forEach(([x, z]) => { const [a, b] = v.P(-x, z); ctx.lineTo(a, b); });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#23272e";
+    for (const [x, z] of [[0.78, 1.8], [-0.78, 1.8], [0.8, -1.75], [-0.8, -1.75]]) { const [a, b] = v.P(x - 0.2, z + 0.36), [c2, d] = v.P(x + 0.2, z - 0.36); ctx.fillRect(a, b, c2 - a, d - b); }
+    // front and rear wing
+    ctx.fillStyle = css("--car2");
+    let [a, b] = v.P(-0.95, 2.95), [c2, d] = v.P(0.95, 2.75); ctx.fillRect(a, b, c2 - a, d - b);
+    [a, b] = v.P(-0.5, -2.55); [c2, d] = v.P(0.5, -2.8); ctx.fillRect(a, b, c2 - a, d - b);
+    // the driver's head
+    const [hx, hz] = v.P(0, 0.05); ctx.beginPath(); ctx.arc(hx, hz, 0.14 * v.sc, 0, 7); ctx.fillStyle = "#454c59"; ctx.fill();
+  } else {
+    SIDE_CAR.forEach(([z, y], i) => { const [a, b] = v.P(z, y); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#23272e";
+    for (const z of [1.8, -1.75]) { const [a, b] = v.P(z, 0.36); ctx.beginPath(); ctx.arc(a, b, 0.36 * v.sc, 0, 7); ctx.fill(); }
+    const [hx, hy] = v.P(0.05, 0.95); ctx.beginPath(); ctx.arc(hx, hy, 0.14 * v.sc, 0, 7); ctx.fillStyle = "#454c59"; ctx.fill();
+  }
+  // ground / axis
+  ctx.strokeStyle = css("--line2"); ctx.setLineDash([3 * v.dpr, 4 * v.dpr]); ctx.beginPath();
+  if (kind === "side") { const [a, b] = v.P(-3.4, 0), [c2] = v.P(3.6, 0); ctx.moveTo(a, b); ctx.lineTo(c2, b); }
+  else { const [a, b] = v.P(0, -3.4), [, d] = v.P(0, 3.4); ctx.moveTo(a, b); ctx.lineTo(a, d); }
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = css("--faint"); ctx.font = `${10.5 * v.dpr}px ${css("--mono")}`;
+  if (kind === "top") { const [a, b] = v.P(0, 3.25); ctx.fillText("▲ forward", a - 28 * v.dpr, b); } else { const [a, b] = v.P(3.1, 2.05); ctx.fillText("forward ▶", a - 40 * v.dpr, b); }
+}
+function drawOb() {
+  if (!OB) return;
+  for (const kind of ["top", "side"]) {
+    const cv = kind === "top" ? $("cvTop") : $("cvSide"); if (!cv) return;
+    const v = obView(cv, kind), ctx = cv.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, v.W, v.H);
+    drawCar(ctx, v, kind);
+    for (const c of S.cams) if (c.type === "onboard") drawObCam(ctx, v, kind, c, c === OB.c);
+  }
+  const c = OB.c, o = getOrient(c.fwd, c.up);
+  $("vTopInfo").textContent = `x ${c.offset[0].toFixed(2)} · z ${c.offset[2].toFixed(2)} · heading ${o.yaw.toFixed(0)}°`;
+  $("vSideInfo").textContent = `y ${c.offset[1].toFixed(2)} · pitch ${o.pitch.toFixed(0)}°`;
+}
+function obProj(kind, p) { return kind === "top" ? [p[0], p[2]] : [p[2], p[1]]; }
+function drawObCam(ctx, v, kind, c, sel) {
+  const col = sel ? css("--sel") : css("--onb");
+  const [u, w] = obProj(kind, c.offset); const [px, py] = v.P(u, w);
+  const f = norm3(c.fwd); let [du, dw] = obProj(kind, f); const dl = Math.hypot(du, dw);
+  if (sel && dl > 0.02) {
+    du /= dl; dw /= dl;
+    // cone: horizontal (16:9) from above, vertical from the side
+    const half = kind === "top" ? Math.atan(Math.tan(c.fov * D2R / 2) * 16 / 9) : c.fov * D2R / 2;
+    const base = Math.atan2(dw, du), R = 2.4;
+    ctx.beginPath(); ctx.moveTo(px, py);
+    for (let k = 0; k <= 12; k++) { const a = base - half + (2 * half * k) / 12; const [qx, qy] = v.P(u + Math.cos(a) * R * dl, w + Math.sin(a) * R * dl); ctx.lineTo(qx, qy); }
+    ctx.closePath(); ctx.fillStyle = "rgba(255,178,30,.13)"; ctx.fill(); ctx.strokeStyle = "rgba(255,178,30,.5)"; ctx.lineWidth = 1 * v.dpr; ctx.stroke();
+  }
+  // direction arrow + handle
+  if (dl > 0.02) {
+    const L = sel ? 0.7 : 0.35; const [hx, hy] = v.P(u + (du / (sel ? 1 : dl)) * L * (sel ? 1 : dl), w + (dw / (sel ? 1 : dl)) * L * (sel ? 1 : dl));
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(hx, hy); ctx.strokeStyle = col; ctx.lineWidth = (sel ? 2 : 1.2) * v.dpr; ctx.stroke();
+    if (sel) { ctx.beginPath(); ctx.arc(hx, hy, 6 * v.dpr, 0, 7); ctx.fillStyle = css("--bg"); ctx.fill(); ctx.lineWidth = 2.5 * v.dpr; ctx.stroke(); v.handle = [hx, hy]; }
+  } else if (sel) v.handle = null;
+  ctx.beginPath(); ctx.arc(px, py, (sel ? 6.5 : 4.5) * v.dpr, 0, 7); ctx.fillStyle = col; ctx.fill();
+  ctx.lineWidth = 1.5 * v.dpr; ctx.strokeStyle = css("--bg"); ctx.stroke();
+  ctx.font = `${(sel ? 12 : 10.5) * v.dpr}px ${css("--ui")}`; ctx.fillStyle = sel ? css("--sel") : css("--muted");
+  ctx.fillText(c.name, px + 9 * v.dpr, py - 7 * v.dpr);
+  if (sel) (kind === "top" ? (OB.vTop = v) : (OB.vSide = v));
+}
+function bindObCanvas(cv, kind) {
+  let drag = null;
+  cv.addEventListener("pointerdown", (e) => {
+    const c = OB.c, v = obView(cv, kind), r = cv.getBoundingClientRect();
+    const px = (e.clientX - r.left) * v.dpr, py = (e.clientY - r.top) * v.dpr;
+    const vv = kind === "top" ? OB.vTop : OB.vSide;
+    if (vv && vv.handle && Math.hypot(px - vv.handle[0], py - vv.handle[1]) < 12 * v.dpr) drag = "rot";
+    else {
+      const [u, w] = obProj(kind, c.offset); const [cx, cy] = v.P(u, w);
+      if (Math.hypot(px - cx, py - cy) < 14 * v.dpr) drag = "move";
+      else {   // click on another camera: select it
+        const hit = S.cams.findIndex((cc) => { if (cc.type !== "onboard") return false; const [a, b] = v.P(...obProj(kind, cc.offset)); return Math.hypot(px - a, py - b) < 10 * v.dpr; });
+        if (hit >= 0) { S.sel = { kind: "cam", i: hit }; render(); return; }
+        drag = "move";
+      }
+    }
+    snapshot(); cv.setPointerCapture(e.pointerId); move(e);
+  });
+  const move = (e) => {
+    if (!drag) return; const c = OB.c, v = obView(cv, kind), r = cv.getBoundingClientRect();
+    const [wu, ww] = v.inv((e.clientX - r.left) * v.dpr, (e.clientY - r.top) * v.dpr);
+    const rnd = (x) => Math.round(x * 100) / 100;
+    if (drag === "move") {
+      if (kind === "top") { c.offset[0] = rnd(wu); if (!e.shiftKey) c.offset[2] = rnd(ww); }
+      else { c.offset[2] = rnd(wu); if (!e.shiftKey) c.offset[1] = rnd(ww); }
+    } else {
+      const [u, w] = obProj(kind, c.offset); const o = getOrient(c.fwd, c.up);
+      if (kind === "top") { let yaw = Math.atan2(wu - u, ww - w) / D2R; if (e.shiftKey) yaw = Math.round(yaw / 5) * 5; o.yaw = yaw; }
+      else {
+        const back = Math.abs(o.yaw) > 90; let dz = wu - u; if (back) dz = -dz;
+        let pitch = Math.atan2(ww - w, Math.max(0.001, dz)) / D2R; if (dz < 0) pitch = clamp(pitch, -89, 89);
+        if (e.shiftKey) pitch = Math.round(pitch); o.pitch = clamp(pitch, -89, 89);
+      }
+      const rr = fromOrient(o.yaw, o.pitch, o.roll); c.fwd = rr.fwd; c.up = rr.up;
+    }
+    syncOb(); refresh();
+  };
+  cv.addEventListener("pointermove", move);
+  cv.addEventListener("pointerup", () => { drag = null; });
+}
+
+// ============================================================ dynamic cameras
+function renderDynamic(c) {
+  OB = null;
+  const box = $("content");
+  const hasSpring = "STIFFNESS" in c.params && "DAMPING" in c.params;
+  box.innerHTML = `<h1></h1><p class="sub" id="dDesc"></p>
+  <div class="cols">
+    <div class="stack">
+      <div class="card"><h2>Parameters<span>applied live when you save</span></h2><div class="params" id="dParams"></div></div>
+    </div>
+    <div class="stack">
+      <div class="views" style="grid-template-columns:1fr">
+        <div class="view"><div class="vh"><span>DIAGRAM · from above</span><span>the car travels up</span></div><canvas id="cvDynTop" style="height:230px"></canvas></div>
+        <div class="view"><div class="vh"><span>DIAGRAM · from the side</span><span>the car travels right</span></div><canvas id="cvDynSide" style="height:170px"></canvas></div>
+      </div>
+      <div class="card" id="respCard" ${hasSpring ? "" : "hidden"}><h2>How it reacts<span id="respInfo"></span></h2><canvas id="resp"></canvas>
+        <p class="note" id="respNote"></p></div>
+    </div>
+  </div>`;
+  box.querySelector("h1").textContent = c.name;
+  $("dDesc").textContent = CAM_DESC[c.name] || "A dynamic camera: it works out its position from the car every frame.";
+  const P = $("dParams");
+  const addGroup = (g) => { const d = document.createElement("div"); d.className = "pgroup"; d.textContent = g; P.appendChild(d); };
+  addGroup("Lens");
+  P.appendChild(numField("Base FOV", c.fov, 1, (v) => { c.fov = v; drawDyn(c); }, { unit: "°", help: "Used when the camera does not work out its own zoom." }));
+  P.appendChild(numField("Near plane", c.near, 0.05, (v) => { c.near = v; }, { unit: "m" }));
+  const groups = {};
+  for (const k of c.porder) { const g = (PDEF[k] || [])[4] || "Other"; (groups[g] = groups[g] || []).push(k); }
+  for (const g of ["Position", "Inertia", "Rescue", "Zoom", "Other"]) {
+    if (!groups[g]) continue; addGroup(g);
+    for (const k of groups[g]) {
+      const d = PDEF[k] || [k, "", 0.1, "", "Other"];
+      const isSpeed = d[1] === "m/s";
+      const f = numField(d[0], c.params[k], d[2], (v) => { c.params[k] = v; drawDyn(c); if (isSpeed) f.querySelector("small").textContent = kmhHelp(d[3], v); }, { unit: d[1], help: isSpeed ? kmhHelp(d[3], c.params[k]) : d[3] || k });
+      f.title = k; P.appendChild(f);
+    }
+  }
+  requestAnimationFrame(() => drawDyn(c));
+}
+const kmhHelp = (h, v) => `${h ? h + " " : ""}≈ ${Math.round(v * KMH)} km/h`;
+function camRelPos(c) {    // ideal position relative to the car: [lateral (+right), forward, height]
+  const p = c.params;
+  if (c.name === "Pit Cam") return { pos: [p.SIDE || 0, p.FWD || 0, p.UP || 0], pit: true };
+  if (c.name === "Circuit Cam") return { pos: [0, 0, p.HEIGHT || 0], look: [0, p.LOOK_AHEAD || 0, 0] };
+  return { pos: [p.SIDE || 0, -(p.BACK || 0), p.HEIGHT || 0], bias: p.OUTSIDE_BIAS ? p.OUTSIDE_BIAS * 0.5 * (p.YAW_FLIP || -1) * -1 : 0 };
+}
+function drawDyn(c) {
+  const rel = camRelPos(c);
+  const fov = (() => { const p = c.params; return p.FOV_BASE || p.FOV_SLOW || p.FOV_STRAIGHT || c.fov; })();
+  for (const kind of ["top", "side"]) {
+    const cv = $(kind === "top" ? "cvDynTop" : "cvDynSide"); if (!cv) return;
+    const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    if (cv.width !== Math.round(r.width * dpr)) { cv.width = r.width * dpr; cv.height = r.height * dpr; }
+    const W = cv.width, H = cv.height, ctx = cv.getContext("2d"); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+    const [cxL, cyF, cz] = rel.pos; const look = rel.look || [0, 0, 0];
+    // the extent to show
+    let us, vs;
+    if (kind === "top") { us = [cxL, 0, look[0], rel.bias || 0]; vs = [cyF, 0, look[1]]; } else { us = [cyF, 0, look[1]]; vs = [cz, 0]; }
+    const pad = 10, uMin = Math.min(...us) - pad, uMax = Math.max(...us) + pad, vMin = Math.min(...vs) - (kind === "side" ? 3 : pad), vMax = Math.max(...vs) + pad * 0.6;
+    const sc = Math.min(W / (uMax - uMin), H / (vMax - vMin)) * 0.9;
+    const cu = (uMin + uMax) / 2, cvv = (vMin + vMax) / 2;
+    const Pp = (u, v) => [W / 2 + (u - cu) * sc, H / 2 - (v - cvv) * sc];
+    // a grid every 10 m
+    ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.font = `${10 * dpr}px ${css("--mono")}`; ctx.fillStyle = css("--faint");
+    const step = (uMax - uMin) > 200 ? 50 : (uMax - uMin) > 80 ? 20 : 10;
+    for (let g = Math.ceil(vMin / step) * step; g <= vMax; g += step) { const [, y] = Pp(0, g); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); if (kind === "side") ctx.fillText(g + " m", 4 * dpr, y - 2 * dpr); }
+    // track / ground
+    if (kind === "top") { const [a] = Pp(-6, 0), [b] = Pp(6, 0); ctx.fillStyle = "rgba(59,66,80,.55)"; ctx.fillRect(a, 0, b - a, H); }
+    else { const [, y] = Pp(0, 0); ctx.fillStyle = "rgba(59,66,80,.55)"; ctx.fillRect(0, y, W, 4 * dpr); }
+    // car
+    const [ox, oy] = Pp(0, 0); ctx.fillStyle = css("--text");
+    if (kind === "top") { ctx.beginPath(); ctx.moveTo(ox, oy - 9 * dpr); ctx.lineTo(ox + 5 * dpr, oy + 7 * dpr); ctx.lineTo(ox - 5 * dpr, oy + 7 * dpr); ctx.closePath(); ctx.fill(); }
+    else { ctx.beginPath(); ctx.moveTo(ox + 9 * dpr, oy - 3 * dpr); ctx.lineTo(ox - 7 * dpr, oy - 6 * dpr); ctx.lineTo(ox - 7 * dpr, oy); ctx.lineTo(ox + 9 * dpr, oy); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = css("--muted"); ctx.fillText(rel.pit ? "pit box" : "car", ox + 10 * dpr, oy + 14 * dpr);
+    // camera
+    const [qx, qy] = kind === "top" ? Pp(cxL, cyF) : Pp(cyF, cz);
+    const [tx, ty] = kind === "top" ? Pp(look[0], look[1]) : Pp(look[1], 0);
+    const half = (kind === "top" ? Math.atan(Math.tan(fov * D2R / 2) * 16 / 9) : fov * D2R / 2);
+    const ang = Math.atan2(ty - qy, tx - qx), R = Math.hypot(tx - qx, ty - qy) * 1.25;
+    ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx + Math.cos(ang - half) * R, qy + Math.sin(ang - half) * R); ctx.lineTo(qx + Math.cos(ang + half) * R, qy + Math.sin(ang + half) * R); ctx.closePath();
+    ctx.fillStyle = "rgba(181,140,255,.14)"; ctx.fill(); ctx.strokeStyle = "rgba(181,140,255,.55)"; ctx.stroke();
+    ctx.setLineDash([3 * dpr, 3 * dpr]); ctx.strokeStyle = css("--dyn"); ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+    if (kind === "top" && rel.bias) { const [bx, by] = Pp(cxL + rel.bias, cyF); ctx.strokeStyle = css("--warn"); ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(bx, by); ctx.stroke(); ctx.fillStyle = css("--warn"); ctx.fillText("in corners", bx + 4 * dpr, by - 4 * dpr); }
+    ctx.beginPath(); ctx.arc(qx, qy, 6.5 * dpr, 0, 7); ctx.fillStyle = css("--dyn"); ctx.fill();
+    ctx.fillStyle = css("--text"); ctx.font = `${11.5 * dpr}px ${css("--ui")}`; ctx.fillText(c.name, qx + 9 * dpr, qy - 8 * dpr);
+    const dist = Math.hypot(cxL - look[0], cyF - look[1], cz);
+    if (kind === "side") { ctx.fillStyle = css("--muted"); ctx.font = `${10.5 * dpr}px ${css("--mono")}`; ctx.fillText(`${Math.round(dist)} m to the car`, W - 150 * dpr, 14 * dpr); }
+  }
+  drawResponse(c);
+}
+// the spring-damper's response: the car jumps 30 m to one side; how does the camera get there?
+function drawResponse(c) {
+  const cv = $("resp"); if (!cv || !("STIFFNESS" in c.params)) return;
+  const K = c.params.STIFFNESS, Dm = c.params.DAMPING, vmax = c.params.MAX_SPEED || Infinity;
+  const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr)) { cv.width = r.width * dpr; cv.height = r.height * dpr; }
+  const W = cv.width, H = cv.height, ctx = cv.getContext("2d"); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+  const dt = 1 / 60, T = 30, STEP = 30; let x = 0, v = 0; const pts = []; let t90 = null, peak = 0;
+  for (let t = 0; t <= T; t += dt) { const a = (STEP - x) * K - v * Dm; v += a * dt; if (Math.abs(v) > vmax) v = Math.sign(v) * vmax; x += v * dt; pts.push([t, x]); peak = Math.max(peak, x); if (t90 === null && x >= STEP * 0.9) t90 = t; }
+  const yMax = Math.max(STEP * 1.1, peak * 1.05), padL = 34 * dpr, padB = 18 * dpr;
+  const X = (t) => padL + (t / T) * (W - padL - 6 * dpr), Y = (y) => H - padB - (y / yMax) * (H - padB - 8 * dpr);
+  ctx.font = `${10 * dpr}px ${css("--mono")}`; ctx.fillStyle = css("--faint"); ctx.strokeStyle = css("--line");
+  for (let y = 0; y <= yMax; y += 10) { ctx.beginPath(); ctx.moveTo(padL, Y(y)); ctx.lineTo(W, Y(y)); ctx.stroke(); ctx.fillText(y + " m", 2 * dpr, Y(y) + 3 * dpr); }
+  for (let t = 0; t <= T; t += 5) ctx.fillText(t + " s", X(t) - 6 * dpr, H - 4 * dpr);
+  ctx.strokeStyle = css("--muted"); ctx.setLineDash([4 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(padL, Y(STEP)); ctx.lineTo(W, Y(STEP)); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = css("--dyn"); ctx.lineWidth = 2 * dpr; ctx.beginPath(); pts.forEach(([t, y], i) => (i ? ctx.lineTo(X(t), Y(y)) : ctx.moveTo(X(t), Y(y)))); ctx.stroke();
+  const zeta = Dm / (2 * Math.sqrt(K));
+  const over = Math.max(0, (peak - STEP) / STEP * 100);
+  $("respInfo").textContent = `damping ratio ${zeta.toFixed(2)}`;
+  const lag = (spd) => Math.min(spd, vmax) === spd ? (spd * Dm / K) : Infinity;
+  $("respNote").innerHTML = `If the car jumps 30 m to one side, the camera takes <b>${t90 === null ? "over 30 s" : t90.toFixed(1) + " s"}</b> to cover 90% of it` +
+    (over > 0.5 ? ` and overshoots by <b>${over.toFixed(0)}%</b> (it oscillates)` : ", without overshooting") +
+    `. Following a car at 250 km/h it stays about <b>${isFinite(lag(250 / KMH)) ? Math.round(lag(250 / KMH)) + " m" : "further and further (beyond its top speed)"}</b> behind its ideal spot.` +
+    (zeta < 0.7 ? " Low damping: a livelier movement that may sway." : zeta > 1.3 ? " Heavily damped: slow, but no bounce." : "");
+}
+
+// ============================================================ director
+const COND = [
+  ["brakeMin", "Brake >", 0.05, "0–1", null], ["gasMin", "Throttle >", 0.05, "0–1", null],
+  ["speedMin", "Speed >", 5, "km/h", KMH], ["speedMax", "Speed <", 5, "km/h", KMH],
+  ["steerMin", "Steering >", 0.05, "0–1", null], ["steerMax", "Steering <", 0.05, "0–1", null],
+];
+function ruleMatches(r, st) {
+  if (r.inPit !== null && r.inPit !== st.pit) return false;
+  if (r.brakeMin !== null && !(st.brake > r.brakeMin)) return false;
+  if (r.gasMin !== null && !(st.gas > r.gasMin)) return false;
+  if (r.speedMin !== null && !(st.speed / KMH > r.speedMin)) return false;
+  if (r.speedMax !== null && !(st.speed / KMH < r.speedMax)) return false;
+  if (r.steerMin !== null && !(st.steer > r.steerMin)) return false;
+  if (r.steerMax !== null && !(st.steer < r.steerMax)) return false;
+  return true;
+}
+function renderDirector() {
+  OB = null;
+  const box = $("content"); const names = S.cams.map((c) => c.name);
+  box.innerHTML = `<h1>Director · the Stream camera</h1><p class="sub">The Stream camera picks what goes on air from what the car is doing. The rules are checked <b>top to bottom</b> and the first that holds wins; within it the director rotates between its cameras, picking the one that has gone longest unused. An empty condition is not checked.</p>
+  <div class="cols">
+    <div class="stack" id="rules"></div>
+    <div class="stack">
+      <div class="card"><h2>Cutting pace</h2><div class="grid2" id="dirOpts"></div>
+        <div class="field" style="margin-top:10px"><span>Urgent cuts (ignore the minimum time)</span><div class="chips" id="urgent"></div></div></div>
+      <div class="card tester"><h2>Try it<span>move the car's values</span></h2><div id="tester"></div><div class="res" id="testRes"></div></div>
+    </div>
+  </div>`;
+  const opts = $("dirOpts");
+  opts.append(numField("Minimum time per shot", S.director.minTime, 0.5, (v) => { S.director.minTime = v; }, { unit: "s", help: "No cut before this, except the urgent ones." }));
+  const urg = $("urgent");
+  for (const n of names) { if (n === "Stream") continue; const ch = document.createElement("button"); ch.className = "chip" + (S.director.urgent.includes(n) ? " on" : ""); ch.style.setProperty("--c", "var(--bad)"); ch.textContent = n;
+    ch.onclick = () => { snapshot(); const i = S.director.urgent.indexOf(n); i >= 0 ? S.director.urgent.splice(i, 1) : S.director.urgent.push(n); ch.classList.toggle("on"); refresh(); }; urg.appendChild(ch); }
+  const list = $("rules");
+  S.rules.forEach((r, idx) => list.appendChild(ruleCard(r, idx, names)));
+  const add = document.createElement("button"); add.className = "btn"; add.textContent = "+ Add a rule";
+  add.onclick = () => { snapshot(); S.rules.splice(Math.max(0, S.rules.length - 1), 0, { name: "New rule", inPit: null, brakeMin: null, gasMin: null, speedMin: null, speedMax: null, steerMin: null, steerMax: null, pool: [] }); renderDirector(); refresh(); };
+  list.appendChild(add);
+  buildTester();
+}
+function ruleCard(r, idx, names) {
+  const d = document.createElement("div"); d.className = "rule"; d.dataset.idx = idx;
+  d.innerHTML = `<div class="rh"><span class="ord">${idx + 1}</span><input type="text" class="rname" style="flex:1"><button class="btn small" data-mv="-1" title="Move up">▲</button><button class="btn small" data-mv="1" title="Move down">▼</button><button class="btn small danger" data-del>Delete</button></div>
+    <div class="conds"></div><div class="field"><span>This rule's cameras</span><div class="chips pool"></div></div>`;
+  const nm = d.querySelector(".rname"); nm.value = r.name; nm.onfocus = () => snapshot(); nm.oninput = () => { r.name = nm.value; refresh(); };
+  d.querySelectorAll("[data-mv]").forEach((b) => b.onclick = () => { const j = idx + +b.dataset.mv; if (j < 0 || j >= S.rules.length) return; snapshot(); [S.rules[idx], S.rules[j]] = [S.rules[j], S.rules[idx]]; renderDirector(); refresh(); });
+  d.querySelector("[data-del]").onclick = () => { snapshot(); S.rules.splice(idx, 1); renderDirector(); refresh(); status(`Rule deleted. Ctrl+Z to undo.`); };
+  const conds = d.querySelector(".conds");
+  const pit = document.createElement("label"); pit.className = "field"; pit.innerHTML = `<span>In the pits</span>`;
+  const sel = document.createElement("select"); sel.innerHTML = `<option value="">Either</option><option value="1">Yes</option><option value="0">No</option>`;
+  sel.value = r.inPit === null ? "" : r.inPit ? "1" : "0"; sel.onchange = () => { snapshot(); r.inPit = sel.value === "" ? null : sel.value === "1"; refresh(); updateTester(); };
+  pit.appendChild(sel); conds.appendChild(pit);
+  for (const [k, label, step, unit, mult] of COND) {
+    const f = numField(label, r[k] === null ? null : (mult ? r[k] * mult : r[k]), step, (v) => { r[k] = v === null ? null : mult ? v / mult : v; updateTester(); },
+      { unit, allowEmpty: true, display: (v) => (mult ? Math.round(v) : +v.toFixed(2)) + "" });
+    f.input.placeholder = "—"; conds.appendChild(f);
+  }
+  const pool = d.querySelector(".pool");
+  for (const n of names) {
+    if (n === "Stream") continue;
+    const c = S.cams.find((x) => x.name === n);
+    const ch = document.createElement("button"); ch.className = "chip" + (r.pool.includes(n) ? " on" : ""); ch.style.setProperty("--c", c && c.type === "onboard" ? "var(--onb)" : "var(--dyn)"); ch.textContent = n;
+    ch.onclick = () => { snapshot(); const i = r.pool.indexOf(n); i >= 0 ? r.pool.splice(i, 1) : r.pool.push(n); ch.classList.toggle("on"); refresh(); updateTester(); };
+    pool.appendChild(ch);
+  }
+  return d;
+}
+function buildTester() {
+  const t = $("tester"); t.innerHTML = "";
+  const mk = (key, label, min, max, step, fmt) => {
+    const row = document.createElement("label"); row.className = "slider";
+    row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
+    const inp = row.querySelector("input"), out = row.querySelector("output"); inp.value = S.test[key];
+    const upd = () => { S.test[key] = +inp.value; out.textContent = fmt(+inp.value); updateTester(); }; inp.oninput = upd; out.textContent = fmt(S.test[key]); t.appendChild(row);
+  };
+  mk("speed", "Speed", 0, 360, 5, (v) => `${v} km/h`);
+  mk("brake", "Brake", 0, 1, 0.05, (v) => v.toFixed(2));
+  mk("gas", "Throttle", 0, 1, 0.05, (v) => v.toFixed(2));
+  mk("steer", "Steering", 0, 1, 0.05, (v) => v.toFixed(2));
+  const pit = document.createElement("label"); pit.className = "row note"; pit.innerHTML = `<input type="checkbox" id="tPit"> In the pits`;
+  t.appendChild(pit); $("tPit").checked = S.test.pit; $("tPit").onchange = (e) => { S.test.pit = e.target.checked; updateTester(); };
+  updateTester();
+}
+function updateTester() {
+  const res = $("testRes"); if (!res) return;
+  const k = S.rules.findIndex((r) => r.pool.length && ruleMatches(r, S.test));
+  document.querySelectorAll(".rule").forEach((el) => el.classList.toggle("hit", +el.dataset.idx === k));
+  res.innerHTML = k < 0 ? `No rule holds: <b style="color:var(--warn)">it keeps the current camera</b>.` :
+    `Rule <b>${k + 1} · ${esc(S.rules[k].name)}</b><br>Rotates between: ${S.rules[k].pool.map(esc).join(", ")}`;
+}
+
+window.addEventListener("resize", () => { if (OB) drawOb(); const c = S.cams[S.sel.i]; if (S.sel.kind === "cam" && c && c.type !== "onboard") drawDyn(c); });
+</script>
+</body>
+</html>

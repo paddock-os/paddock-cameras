@@ -2,3 +2,6 @@
 .DS_Store
 Thumbs.db
 .vscode/
+
+# The editor keeps the previous settings here on every save
+_backup/

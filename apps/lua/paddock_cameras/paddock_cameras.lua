@@ -45,6 +45,43 @@ local FREEZE_AUTO_EXPOSURE = true
 -- the whole name to 46 characters.
 local OBS_GROUP = 'Paddock OS'
 
+-- ===================== EDITABLE CONFIGURATION (paddock_cameras.ini) =====================
+-- The defaults are below; paddock_cameras.ini, beside this script, overrides
+-- them. The web editor (web/editor.html) writes that file, and the app reloads
+-- it by itself when it is saved: no restart of AC or OBS. The exception is the
+-- render options (mips, shadows…), which only apply when a source is created
+-- (restart the session, or resize the source in OBS).
+local CONFIG_FILE = ac.getFolder(ac.FolderID.ScriptOrigin) .. '/paddock_cameras.ini'
+
+-- Names cameras had before, still read from an older paddock_cameras.ini (or
+-- from a copied rsr_cameras.ini).
+local CAM_ALIASES = { ['SC Chase Aerea'] = 'SC Chase Aerial' }
+
+-- The dynamic cameras' parameters, by the names of their tunables.
+local PARAMS = {}
+PARAMS['Drone Cam'] = { HEIGHT = 50, STIFFNESS = 0.2, DAMPING = 0.9, MAX_SPEED = 90, MAX_DIST = 110, LOOKAHEAD = 0.15, OUTSIDE_BIAS = 35, YAW_FLIP = -1, YAW_SMOOTH = 1.2, FOV_FAST = 28, FOV_SLOW = 20, SPEED_FAST = 75, SPEED_SLOW = 25, FOV_SMOOTH = 1.5 }
+PARAMS['Helicopter Cam'] = { HEIGHT = 90, BACK = 70, SIDE = 25, STIFFNESS = 0.06, DAMPING = 0.4, MAX_SPEED = 75, SOFT_DIST = 130, HARD_DIST = 380, SPEED_BOOST = 0.28, FOV_BASE = 18, FOV_TIGHT = 9, FOV_SMOOTH = 1 }
+PARAMS['Pit Cam'] = { SIDE = -4, UP = 2, FWD = 2 }
+PARAMS['Circuit Cam'] = { HEIGHT = 65, SPEED = 95, LOOK_AHEAD = 80, FOV_STRAIGHT = 32, FOV_CURVE = 44, FOV_SMOOTH = 1.2 }
+PARAMS['SC Chase Aerial'] = { HEIGHT = 18, BACK = 22, STIFFNESS = 0.18, DAMPING = 0.85, LOOKAHEAD = 0.1 }
+PARAMS['SC Side Pack'] = { SIDE = 30, BACK = 6, HEIGHT = 3.5, STIFFNESS = 0.22, DAMPING = 0.9 }
+
+-- The Stream camera's director. Speeds in m/s (25 m/s = 90 km/h). Rules are
+-- checked in order and the first that holds picks the pool it cuts between;
+-- a condition left out is not checked.
+local DIRECTOR = {
+  minTime = 8.0,                       -- minimum seconds per shot
+  urgent  = { ['Pit Cam'] = true },    -- cameras that cut at once, cooldown or not
+  rules   = {
+    { name = 'Pit lane',     inPit = true,                                  pool = { 'Pit Cam' } },
+    { name = 'Heavy braking', brakeMin = 0.6, speedMin = 25,                pool = { 'Helmet Cam', 'Onboard Side', 'T-Cam' } },
+    { name = 'Cornering',    steerMin = 0.35, speedMin = 15,                pool = { 'Onboard Side', 'Helmet Cam', 'Halo POV', 'T-Cam' } },
+    { name = 'Flat out',     speedMin = 55, gasMin = 0.85, steerMax = 0.10, pool = { 'Nose Cam', 'T-Cam', 'Helicopter Cam' } },
+    { name = 'Medium speed', speedMin = 15,                                 pool = { 'Helicopter Cam', 'Drone Cam', 'T-Cam', 'Onboard Side' } },
+    { name = 'Slow',                                                        pool = { 'Helicopter Cam', 'Drone Cam', 'Pit Cam' } },
+  },
+}
+
 -- ===================== CAMERAS =====================
 -- Every camera renders through YEBIS with the user's active PP filter: the
 -- same tonemap, exposure curve, colour grading, bloom and DOF as the game's
@@ -137,23 +174,24 @@ local CAMS = {
       return function(car, sim)
         if not car.transform or not car.transform.position then return nil end
 
-        -- ---- Tunables ----
-        local HEIGHT       = 50.0   -- target height above the car (m)
-        local STIFFNESS    = 0.20   -- spring strength (lower = lazier sideways)
-        local DAMPING      = 0.9    -- damping (~2*sqrt(STIFFNESS) is critical)
-        local MAX_SPEED    = 90.0   -- top speed of the drone (m/s, ~325 km/h)
-        local MAX_DIST     = 110.0  -- never let the car get further than this (m)
-        local LOOKAHEAD    = 0.15   -- a little anticipation keeps the car centred
-        local OUTSIDE_BIAS = 35.0   -- metres towards the outside of the corner per rad/s of yaw
-        local YAW_FLIP     = -1     -- if it drifts to the INSIDE of corners instead, set +1
-        local YAW_SMOOTH   = 1.2    -- seconds of yaw smoothing, so corner entry and exit do not jump
+        -- ---- Tunables (PARAMS, overridden by paddock_cameras.ini) ----
+        local P = PARAMS['Drone Cam']
+        local HEIGHT       = P.HEIGHT        -- target height above the car (m)
+        local STIFFNESS    = P.STIFFNESS     -- spring strength (lower = lazier sideways)
+        local DAMPING      = P.DAMPING       -- damping (~2*sqrt(STIFFNESS) is critical)
+        local MAX_SPEED    = P.MAX_SPEED     -- top speed of the drone (m/s)
+        local MAX_DIST     = P.MAX_DIST      -- never let the car get further than this (m)
+        local LOOKAHEAD    = P.LOOKAHEAD     -- a little anticipation keeps the car centred
+        local OUTSIDE_BIAS = P.OUTSIDE_BIAS  -- metres towards the outside of the corner per rad/s of yaw
+        local YAW_FLIP     = P.YAW_FLIP      -- if it drifts to the INSIDE of corners instead, set +1
+        local YAW_SMOOTH   = P.YAW_SMOOTH    -- seconds of yaw smoothing, so corner entry and exit do not jump
         -- Dynamic zoom: the FOV closes in when the car is slow (corners,
         -- braking) and opens up flat out on the straights.
-        local FOV_FAST     = 28     -- FOV at SPEED_FAST and above (tighter = does not drift as far)
-        local FOV_SLOW     = 20     -- FOV at SPEED_SLOW and below (slow corner, heavy braking)
-        local SPEED_FAST   = 75     -- m/s ≈ 270 km/h
-        local SPEED_SLOW   = 25     -- m/s ≈ 90 km/h
-        local FOV_SMOOTH   = 1.5    -- seconds of zoom smoothing
+        local FOV_FAST     = P.FOV_FAST      -- FOV at SPEED_FAST and above (tighter = does not drift as far)
+        local FOV_SLOW     = P.FOV_SLOW      -- FOV at SPEED_SLOW and below (slow corner, heavy braking)
+        local SPEED_FAST   = P.SPEED_FAST    -- m/s (75 ≈ 270 km/h)
+        local SPEED_SLOW   = P.SPEED_SLOW    -- m/s (25 ≈ 90 km/h)
+        local FOV_SMOOTH   = P.FOV_SMOOTH    -- seconds of zoom smoothing
         -- -------------------
 
         local dt     = sim.dt or 1/60
@@ -271,25 +309,26 @@ local CAMS = {
       return function(car, sim)
         if not car.transform or not car.transform.position then return nil end
 
-        -- ---- Tunables ----
-        local HEIGHT       = 90.0   -- height above the car (m); broadcast is ~80–120 m
-        local BACK         = 70.0   -- distance behind the car (m, along its travel)
-        local SIDE         = 25.0   -- lateral offset (m); negative for the other side
-        local STIFFNESS    = 0.06   -- a very loose spring → perceived mass
-        local DAMPING      = 0.40   -- close to critical, so it does not oscillate
-        local MAX_SPEED    = 75.0   -- m/s ≈ 270 km/h, the helicopter's cruise speed
+        -- ---- Tunables (PARAMS, overridden by paddock_cameras.ini) ----
+        local P = PARAMS['Helicopter Cam']
+        local HEIGHT       = P.HEIGHT       -- height above the car (m); broadcast is ~80–120 m
+        local BACK         = P.BACK         -- distance behind the car (m, along its travel)
+        local SIDE         = P.SIDE         -- lateral offset (m); negative for the other side
+        local STIFFNESS    = P.STIFFNESS    -- a very loose spring → perceived mass
+        local DAMPING      = P.DAMPING      -- close to critical, so it does not oscillate
+        local MAX_SPEED    = P.MAX_SPEED    -- m/s, the helicopter's cruise speed (75 ≈ 270 km/h)
 
         -- "Rescue" when the car gets away: from SOFT_DIST the helicopter opens
         -- the throttle progressively (a speed boost) AND the operator closes
         -- the zoom (a smaller FOV) to keep the car a visible size. Both at
         -- once read as one organic move, with no teleport and no sudden
         -- acceleration. At HARD_DIST both are at their maximum.
-        local SOFT_DIST    = 130    -- m, where the rescue starts
-        local HARD_DIST    = 380    -- m, where it is at its maximum
-        local SPEED_BOOST  = 0.28   -- +28% over cruise (75 → 96 m/s ≈ 346 km/h)
-        local FOV_BASE     = 18     -- FOV in normal conditions (close to the car)
-        local FOV_TIGHT    = 9      -- FOV at full zoom (far from the car)
-        local FOV_SMOOTH   = 1.0    -- seconds of zoom smoothing
+        local SOFT_DIST    = P.SOFT_DIST    -- m, where the rescue starts
+        local HARD_DIST    = P.HARD_DIST    -- m, where it is at its maximum
+        local SPEED_BOOST  = P.SPEED_BOOST  -- over cruise (0.28 = +28%)
+        local FOV_BASE     = P.FOV_BASE     -- FOV in normal conditions (close to the car)
+        local FOV_TIGHT    = P.FOV_TIGHT    -- FOV at full zoom (far from the car)
+        local FOV_SMOOTH   = P.FOV_SMOOTH   -- seconds of zoom smoothing
         -- -------------------
 
         local dt     = sim.dt or 1/60
@@ -403,7 +442,8 @@ local CAMS = {
       local pt = car.pitTransform
       if not pt or not pt.position then return nil end
 
-      local SIDE, UP, FWD = -4.0, 2, 2.0
+      local P = PARAMS['Pit Cam']
+      local SIDE, UP, FWD = P.SIDE, P.UP, P.FWD
       local camPos = pt.position
         + pt.side * SIDE
         + pt.up   * UP
@@ -458,12 +498,13 @@ local CAMS = {
         end
 
         -- ============ ALONG THE AI LINE ============
-        local HEIGHT       = 65
-        local SPEED        = 95     -- m/s
-        local LOOK_AHEAD   = 80     -- m
-        local FOV_STRAIGHT = 32
-        local FOV_CURVE    = 44
-        local FOV_SMOOTH   = 1.2
+        local P = PARAMS['Circuit Cam']
+        local HEIGHT       = P.HEIGHT
+        local SPEED        = P.SPEED        -- m/s
+        local LOOK_AHEAD   = P.LOOK_AHEAD   -- m
+        local FOV_STRAIGHT = P.FOV_STRAIGHT
+        local FOV_CURVE    = P.FOV_CURVE
+        local FOV_SMOOTH   = P.FOV_SMOOTH
 
         local length = sim.trackLengthM
         if type(length) ~= 'number' or length < 100 then length = 5000 end
@@ -552,12 +593,13 @@ local CAMS = {
       return function(car, sim)
         if not car.transform or not car.transform.position then return nil end
 
-        -- ---- Tunables ----
-        local HEIGHT    = 18.0   -- low → the pack is compressed behind the Safety Car
-        local BACK      = 22.0   -- distance behind the Safety Car along its travel
-        local STIFFNESS = 0.18
-        local DAMPING   = 0.85
-        local LOOKAHEAD = 0.10   -- seconds of anticipation → its nose high in the frame
+        -- ---- Tunables (PARAMS, overridden by paddock_cameras.ini) ----
+        local P = PARAMS['SC Chase Aerial']
+        local HEIGHT    = P.HEIGHT      -- low → the pack is compressed behind the Safety Car
+        local BACK      = P.BACK        -- distance behind the Safety Car along its travel
+        local STIFFNESS = P.STIFFNESS
+        local DAMPING   = P.DAMPING
+        local LOOKAHEAD = P.LOOKAHEAD   -- seconds of anticipation → its nose high in the frame
         -- -------------------
 
         local dt     = sim.dt or 1/60
@@ -617,12 +659,13 @@ local CAMS = {
       return function(car, sim)
         if not car.transform or not car.transform.position then return nil end
 
-        -- ---- Tunables ----
-        local SIDE      = 30.0   -- m to the Safety Car's right (negative = left)
-        local BACK      = 6.0    -- m behind it → it sits towards the left of the frame
-        local HEIGHT    = 3.5    -- height above the tarmac (m) — almost at ground level
-        local STIFFNESS = 0.22
-        local DAMPING   = 0.90
+        -- ---- Tunables (PARAMS, overridden by paddock_cameras.ini) ----
+        local P = PARAMS['SC Side Pack']
+        local SIDE      = P.SIDE        -- m to the Safety Car's right (negative = left)
+        local BACK      = P.BACK        -- m behind it → it sits towards the left of the frame
+        local HEIGHT    = P.HEIGHT      -- height above the tarmac (m) — almost at ground level
+        local STIFFNESS = P.STIFFNESS
+        local DAMPING   = P.DAMPING
         -- -------------------
 
         local dt     = sim.dt or 1/60
@@ -696,8 +739,10 @@ end
 -- Defined after CAMS because it needs the whole list, and appended to it just
 -- before the cameras are registered.
 --
--- It cuts between the other cameras on what the car is doing, with at least
--- MIN_TIME_IN_CAM seconds per shot. By priority:
+-- It cuts between the other cameras on what the car is doing, by the rules in
+-- DIRECTOR (paddock_cameras.ini: [DIRECTOR] and [RULE_n]), with at least
+-- DIRECTOR.minTime seconds per shot except for the urgent cameras. The
+-- defaults, by priority:
 --   1. In the pit lane → Pit Cam (an immediate cut, no cooldown).
 --   2. Heavy braking   → Helmet / Onboard Side / T-Cam (immersive).
 --   3. Cornering       → Onboard Side / Helmet / Halo POV / T-Cam.
@@ -720,9 +765,6 @@ local STREAM_CAM = {
   opaqueAlphaFix = true,
   altShadows     = true,
   dynamic = (function()
-    local MIN_TIME_IN_CAM = 8.0   -- minimum seconds before a cut
-    local URGENT          = { ['Pit Cam'] = true }  -- exceptions to the cooldown
-
     local currentCam = nil
     local timeInCam  = 0
     local elapsed    = 0          -- its own clock (independent of sim.time)
@@ -741,30 +783,32 @@ local STREAM_CAM = {
       return filtered[1]
     end
 
-    -- The director's call, from the car's state.
-    local function pickCamera(car)
-      local steerAbs = math.abs(car.steer or 0)
-      local speed    = car.velocity and car.velocity:length() or 0
-      local brake    = car.brake or 0
-      local gas      = car.gas or 0
-      local inPit    = car.isInPitlane or car.isInPit or false
+    -- Whether a rule holds for the car's state; a condition left out is not checked.
+    local function ruleMatches(r, st)
+      if r.inPit ~= nil and r.inPit ~= st.inPit then return false end
+      if r.brakeMin and not (st.brake > r.brakeMin) then return false end
+      if r.gasMin   and not (st.gas > r.gasMin) then return false end
+      if r.speedMin and not (st.speed > r.speedMin) then return false end
+      if r.speedMax and not (st.speed < r.speedMax) then return false end
+      if r.steerMin and not (st.steer > r.steerMin) then return false end
+      if r.steerMax and not (st.steer < r.steerMax) then return false end
+      return true
+    end
 
-      if inPit then
-        return 'Pit Cam'
+    -- The director's call: the first rule that holds, rotating within its
+    -- pool. With none holding it stays on the current camera.
+    local function pickCamera(car)
+      local st = {
+        steer = math.abs(car.steer or 0),
+        speed = car.velocity and car.velocity:length() or 0,
+        brake = car.brake or 0,
+        gas   = car.gas or 0,
+        inPit = (car.isInPitlane or car.isInPit) and true or false,
+      }
+      for _, r in ipairs(DIRECTOR.rules) do
+        if r.pool and #r.pool > 0 and ruleMatches(r, st) then return rotate(r.pool) end
       end
-      if brake > 0.6 and speed > 25 then
-        return rotate({ 'Helmet Cam', 'Onboard Side', 'T-Cam' })
-      end
-      if steerAbs > 0.35 and speed > 15 then
-        return rotate({ 'Onboard Side', 'Helmet Cam', 'Halo POV', 'T-Cam' })
-      end
-      if speed > 55 and gas > 0.85 and steerAbs < 0.10 then
-        return rotate({ 'Nose Cam', 'T-Cam', 'Helicopter Cam' })
-      end
-      if speed > 15 then
-        return rotate({ 'Helicopter Cam', 'Drone Cam', 'T-Cam', 'Onboard Side' })
-      end
-      return rotate({ 'Helicopter Cam', 'Drone Cam', 'Pit Cam' })
+      return currentCam
     end
 
     return function(car, sim)
@@ -788,13 +832,13 @@ local STREAM_CAM = {
         end
       end
 
-      -- The call, with its cooldown. Pit Cam is urgent: it cuts at once.
+      -- The call, with its cooldown. An urgent camera cuts at once.
       local desired = pickCamera(car)
-      local urgent  = URGENT[desired] and desired ~= currentCam
+      local urgent  = desired and DIRECTOR.urgent[desired] and desired ~= currentCam
       local canSwitch = not currentCam
                      or urgent
-                     or (timeInCam >= MIN_TIME_IN_CAM and desired ~= currentCam)
-      if canSwitch and results[desired] then
+                     or (timeInCam >= DIRECTOR.minTime and desired ~= currentCam)
+      if canSwitch and desired and results[desired] then
         currentCam = desired
         timeInCam  = 0
         lastUsed[desired] = elapsed
@@ -810,6 +854,102 @@ local STREAM_CAM = {
   end)(),
 }
 CAMS[#CAMS + 1] = STREAM_CAM
+
+-- A static camera's vectors, normalised once — again whenever the ini moves it.
+local function prepare(cfg)
+  cfg.forwardN = cfg.forward and cfg.forward:clone():normalize() or nil
+  cfg.upN      = cfg.up      and cfg.up:clone():normalize()      or nil
+end
+
+-- ===================== LOADING AND RELOADING paddock_cameras.ini =====================
+local function iniParse(text)
+  local out, cur = {}, nil
+  for line in (text .. '\n'):gmatch('([^\r\n]*)\r?\n') do
+    line = line:gsub('^%s+', ''):gsub('%s+$', '')
+    local sec = line:match('^%[(.+)%]$')
+    if sec then
+      cur = {}
+      out[#out + 1] = { name = sec, kv = cur }
+    elseif cur and line ~= '' and not line:find('^;') then
+      local k, v = line:match('^([^=]+)=(.*)$')
+      if k then cur[(k:gsub('%s+$', ''))] = (v:gsub('^%s+', '')) end
+    end
+  end
+  return out
+end
+local function iniVec(s)
+  local t = {}
+  for n in tostring(s):gmatch('[-%d%.eE+]+') do t[#t + 1] = tonumber(n) end
+  if #t < 3 then return nil end
+  return vec3(t[1], t[2], t[3])
+end
+local function camName(name) return CAM_ALIASES[name] or name end
+local function iniList(s)
+  local t = {}
+  for part in tostring(s or ''):gmatch('[^|]+') do
+    part = part:gsub('^%s+', ''):gsub('%s+$', '')
+    if part ~= '' then t[#t + 1] = camName(part) end
+  end
+  return t
+end
+local function iniNum(s) if s == nil or s == '' then return nil end return tonumber((tostring(s):gsub(',', '.'))) end
+
+local function loadConfig()
+  local text = io.load(CONFIG_FILE)
+  if not text then return false end
+  local byName = {}
+  for _, cfg in ipairs(CAMS) do byName[cfg.name] = cfg end
+  local rules = {}
+  for _, sec in ipairs(iniParse(text)) do
+    local kv = sec.kv
+    local name = sec.name:match('^CAM:(.+)$')
+    name = name and camName(name)
+    if name and byName[name] then
+      local cfg = byName[name]
+      cfg.fov      = iniNum(kv.FOV) or cfg.fov
+      cfg.nearClip = iniNum(kv.NEAR) or cfg.nearClip
+      if cfg.offset then
+        cfg.offset  = iniVec(kv.OFFSET) or cfg.offset
+        cfg.forward = iniVec(kv.FORWARD) or cfg.forward
+        cfg.up      = iniVec(kv.UP) or cfg.up
+        prepare(cfg)
+      end
+      local p = PARAMS[name]
+      if p then for k in pairs(p) do local v = iniNum(kv[k]); if v then p[k] = v end end end
+    elseif sec.name == 'DIRECTOR' then
+      DIRECTOR.minTime = iniNum(kv.MIN_TIME) or DIRECTOR.minTime
+      if kv.URGENT ~= nil then
+        DIRECTOR.urgent = {}
+        for _, n in ipairs(iniList(kv.URGENT)) do DIRECTOR.urgent[n] = true end
+      end
+    elseif sec.name:match('^RULE_%d+$') then
+      local pit = kv.IN_PIT
+      rules[#rules + 1] = {
+        order    = tonumber(sec.name:match('%d+')),
+        name     = kv.NAME,
+        inPit    = (pit == '1' and true) or (pit == '0' and false) or nil,
+        brakeMin = iniNum(kv.BRAKE_MIN), gasMin = iniNum(kv.GAS_MIN),
+        speedMin = iniNum(kv.SPEED_MIN), speedMax = iniNum(kv.SPEED_MAX),
+        steerMin = iniNum(kv.STEER_MIN), steerMax = iniNum(kv.STEER_MAX),
+        pool     = iniList(kv.POOL),
+      }
+    end
+  end
+  if #rules > 0 then
+    table.sort(rules, function(a, b) return a.order < b.order end)
+    DIRECTOR.rules = rules
+  end
+  pcall(ac.log, '[Paddock Cameras] paddock_cameras.ini loaded (' .. #DIRECTOR.rules .. ' director rules)')
+  return true
+end
+
+loadConfig()
+pcall(function()
+  ac.onFileChanged(CONFIG_FILE, function()
+    local ok, err = pcall(loadConfig)
+    if not ok then pcall(ac.warn, '[Paddock Cameras] could not reload paddock_cameras.ini: ' .. tostring(err)) end
+  end)
+end)
 
 -- ===================== FOLLOWING A CAR =====================
 
@@ -910,10 +1050,9 @@ local function configureShot(shot, cfg)
 end
 
 local function registerCamera(cfg)
-  -- Static cameras' vectors are normalised once; dynamic cameras return
-  -- world-space vectors every frame.
-  cfg.forwardN = cfg.forward and cfg.forward:clone():normalize() or nil
-  cfg.upN      = cfg.up      and cfg.up:clone():normalize()      or nil
+  -- Static cameras' vectors are normalised here and on every reload of the
+  -- ini; dynamic cameras return world-space vectors every frame.
+  prepare(cfg)
   local camShot
 
   return obs.register(OBS_GROUP, cfg.name,

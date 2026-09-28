@@ -34,6 +34,8 @@ that you end up with:
 ```
 assettocorsa/apps/lua/paddock_cameras/manifest.ini
 assettocorsa/apps/lua/paddock_cameras/paddock_cameras.lua
+assettocorsa/apps/lua/paddock_cameras/paddock_cameras.ini
+assettocorsa/apps/lua/paddock_cameras/web/editor.html
 ```
 
 The app loads by itself (`LAZY = NONE`): there is nothing to open in game.
@@ -65,7 +67,34 @@ scene cost nothing.
 
 Every camera follows the car Assetto Corsa is focused on.
 
-## Settings
+## Tuning the cameras: the editor
+
+Every camera's framing and behaviour, and the Stream director's rules, live in
+`paddock_cameras.ini`, and **the app reloads that file by itself when it is
+saved** — the change shows in OBS at once, with AC and OBS still running.
+
+The easy way to edit it is the editor that comes with the app,
+`web/editor.html`. Open it in a Chromium browser (Chrome, Edge), press *Open
+the paddock_cameras folder* and pick `assettocorsa/apps/lua/paddock_cameras`:
+
+- **onboard cameras** — drag the camera and its direction on a top and a side
+  view of the car, or type position, heading, pitch, roll and FOV;
+- **dynamic cameras** — every tunable with its unit and what it does, a
+  diagram of where the camera sits, and for the spring-driven ones a plot of
+  how it reacts (how long it takes to catch up, whether it overshoots);
+- **the director** — the Stream camera's rules, checked top to bottom: the
+  conditions (pit lane, brake, throttle, speed, steering), the cameras each
+  rule rotates between, the minimum time per shot and the cameras that cut at
+  once; and a tester that shows which rule a given car state picks.
+
+*Save* writes the file (keeping the previous one in `_backup/`), and the app
+picks it up. In a browser without folder access, open the `.ini` alone:
+*Save* then downloads it, to copy into the folder yourself.
+
+The render options (mipmaps, shadows…) are not in the file: they only apply
+when a source is created — restart the session, or resize the source in OBS.
+
+## Settings in the script
 
 At the top of `paddock_cameras.lua`:
 
@@ -77,13 +106,14 @@ At the top of `paddock_cameras.lua`:
 | `FREEZE_AUTO_EXPOSURE` | `true` | Freeze adaptive auto-exposure while the app runs, so a dozen cameras do not make it pump. It is a setting of the whole scene, the game's own view included, and only works where CSP gives apps that control — the app logs it when it does not |
 | `OBS_GROUP` | `'Paddock OS'` | The prefix of the source names in OBS |
 
-Each camera in the `CAMS` table has its own tunables — position, field of
-view, and for the aerials height, spring stiffness, top speed and zoom — with
-a comment on what each one does. Add `exposure = <value>` to a camera to give
-it its own exposure (YEBIS, photographic scale: negative is darker).
+The cameras' own defaults are in the script too — `CAMS` for position and
+FOV, `PARAMS` for the dynamic cameras' tunables, `DIRECTOR` for the Stream's
+rules — and `paddock_cameras.ini` overrides them. Add `exposure = <value>` to a
+camera in `CAMS` to give it its own exposure (YEBIS, photographic scale:
+negative is darker).
 
-After editing, reload the app: CSP's *Lua Debug* app → Reload, or restart the
-session.
+After editing the script, reload the app: CSP's *Lua Debug* app → Reload, or
+restart the session.
 
 ## Adding a camera
 
@@ -96,8 +126,11 @@ Add an entry to `CAMS`:
 
 A dynamic camera may keep state between frames (see the Drone or the
 Helicopter); the app guarantees it is advanced once per simulation tick, even
-when the Stream director is evaluating it too. To have the director cut to it,
-add its name to one of the pools in `STREAM_CAM`.
+when the Stream director is evaluating it too. Put its tunables in `PARAMS`
+(under the camera's name) to make them editable from the `.ini`, and add a
+`[CAM:<name>]` section to `paddock_cameras.ini` for the editor to list it. To
+have the director cut to it, add it to a rule's pool — in the editor, or in
+`DIRECTOR`.
 
 ## Licence
 
